@@ -32,6 +32,8 @@ running a server.
 
 ## Setup
 
+A detailed step-by-step walkthrough, with troubleshooting, is in [docs/SETUP.md](docs/SETUP.md).
+
 Everything below needs the phone in hand once; afterwards it runs unattended.
 
 ### 1. Broker
