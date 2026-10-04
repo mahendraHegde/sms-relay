@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- ws://localhost is allowed only for the local test broker (test/broker); real brokers use wss://. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src wss: ws://localhost:* ws://127.0.0.1:*; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>SMS Relay</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+  <script src="vendor/mqtt.min.js" integrity="sha384-Bi12oAdYr14AFkifhhBlMiJVpDvueq9uEXPV1B+vtGzvngGIdSIi/k4kDG+YDnyY"></script>
+  <script src="vendor/qrcode.js" integrity="sha384-8FWZA6BGMXhsfO+BLtrJK0We6gg5o1JyO8xQm6peWDEUs17ACA5ziE/NIAkl9z2k"></script>
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <main id="app"><p>Loading…</p></main>
+</body>
+</html>

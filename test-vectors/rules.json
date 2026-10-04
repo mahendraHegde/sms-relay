@@ -1,0 +1,28 @@
+{
+  "_comment": "Forwarding-rule limits and matching cases shared by core/RulesTest.kt (+ PhoneCoreTest for the rate limits) and reader/test/rules.test.mjs, so the reader's checks and preview agree with the phone.",
+  "limits": { "rules": 50, "nodes": 20, "value": 200, "name": 60, "destinations": 5, "setBytes": 32768, "perHour": 20, "perDay": 100, "allowlist": 20 },
+  "cases": [
+    { "when": { "field": "body", "op": "contains", "value": "otp" }, "sender": "EXBANK", "body": "Your OTP is 1", "match": true },
+    { "when": { "field": "body", "op": "contains", "value": "otp" }, "sender": "EXBANK", "body": "Your code is 1", "match": false },
+    { "when": { "field": "sender", "op": "equals", "value": "exbank" }, "sender": "EXBANK", "body": "x", "match": true },
+    { "when": { "field": "sender", "op": "equals", "value": "EXBANK" }, "sender": "EXBANK2", "body": "x", "match": false },
+    { "when": { "field": "sender", "op": "startsWith", "value": "+1555" }, "sender": "+15555550100", "body": "x", "match": true },
+    { "when": { "field": "body", "op": "endsWith", "value": "STOP" }, "sender": "A", "body": "reply stop", "match": true },
+    { "when": { "not": { "field": "body", "op": "contains", "value": "promo" } }, "sender": "A", "body": "a PROMO offer", "match": false },
+    { "when": { "not": { "field": "sender", "op": "equals", "value": "A" } }, "sender": "B", "body": "x", "match": true },
+    { "when": { "all": [ { "field": "body", "op": "contains", "value": "XXX" }, { "field": "body", "op": "contains", "value": "YYY" } ] }, "sender": "S", "body": "xxx and yyy", "match": true },
+    { "when": { "all": [ { "field": "body", "op": "contains", "value": "XXX" }, { "field": "body", "op": "contains", "value": "YYY" } ] }, "sender": "S", "body": "only xxx", "match": false },
+    { "when": { "any": [ { "all": [ { "field": "body", "op": "contains", "value": "XXX" }, { "field": "body", "op": "contains", "value": "YYY" } ] }, { "field": "sender", "op": "equals", "value": "ZZZ" } ] }, "sender": "zzz", "body": "none", "match": true },
+    { "when": { "any": [ { "all": [ { "field": "body", "op": "contains", "value": "XXX" }, { "not": { "field": "sender", "op": "startsWith", "value": "SPAM" } } ] }, { "field": "sender", "op": "equals", "value": "ZZZ" } ] }, "sender": "SPAMMER", "body": "XXX", "match": false },
+    { "when": { "any": [ { "field": "body", "op": "contains", "value": "OTP" }, { "field": "body", "op": "contains", "value": "code" } ] }, "sender": "A", "body": "your CODE", "match": true },
+    { "when": { "all": [ { "field": "sender", "op": "contains", "value": "EXBANK" }, { "any": [ { "field": "body", "op": "contains", "value": "OTP" }, { "field": "body", "op": "contains", "value": "code" } ] } ] }, "sender": "EXBANK", "body": "a code", "match": true },
+    { "when": { "all": [ { "field": "sender", "op": "contains", "value": "EXBANK" }, { "any": [ { "field": "body", "op": "contains", "value": "OTP" }, { "field": "body", "op": "contains", "value": "code" } ] } ] }, "sender": "OTHER", "body": "a code", "match": false },
+    { "when": { "all": [ { "field": "sender", "op": "contains", "value": "EXBANK" }, { "any": [ { "field": "body", "op": "contains", "value": "OTP" }, { "field": "body", "op": "contains", "value": "code" } ] } ] }, "sender": "EXBANK", "body": "balance", "match": false },
+    { "when": { "field": "body", "op": "contains", "value": "ünï" }, "sender": "A", "body": "ÜNÏcode", "match": true },
+    { "when": { "field": "body", "op": "contains", "value": "istanbul" }, "sender": "A", "body": "İSTANBUL", "match": false },
+    { "when": { "field": "body", "op": "contains", "value": "οδος" }, "sender": "A", "body": "ΟΔΟΣ", "match": true },
+    { "when": { "field": "body", "op": "contains", "value": "οδοσ" }, "sender": "A", "body": "ΟΔΟΣ", "match": false },
+    { "when": { "field": "body", "op": "endsWith", "value": "end" }, "sender": "A", "body": "end of it", "match": false },
+    { "when": { "field": "sender", "op": "startsWith", "value": "BANK" }, "sender": "EXBANK", "body": "x", "match": false }
+  ]
+}

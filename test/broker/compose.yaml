@@ -1,0 +1,23 @@
+# Local stand-in for EMQX, for end-to-end tests only (never for real use: plain TCP, test passwords).
+# Same rules as the README's EMQX setup: two users, per-user topic ACLs, WebSocket port for the reader.
+#   docker compose -f test/broker/compose.yaml up -d     # start
+#   docker compose -f test/broker/compose.yaml down -v   # stop and remove (incl. its data volume)
+services:
+  broker:
+    image: eclipse-mosquitto:2.0
+    container_name: smsrelay-test-broker
+    ports:
+      - "127.0.0.1:1883:1883" # phone (MQTT)
+      - "127.0.0.1:9001:9001" # reader (MQTT over WebSocket)
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./acl:/mosquitto/config/acl.src:ro
+    # Test credentials, generated inside the container on each start.
+    entrypoint: >
+      sh -c "rm -f /mosquitto/data/passwd /mosquitto/data/acl &&
+             mosquitto_passwd -b -c /mosquitto/data/passwd phone phonepass &&
+             mosquitto_passwd -b /mosquitto/data/passwd reader readerpass &&
+             cp /mosquitto/config/acl.src /mosquitto/data/acl &&
+             chmod 0700 /mosquitto/data/passwd /mosquitto/data/acl &&
+             chown mosquitto:mosquitto /mosquitto/data/passwd /mosquitto/data/acl &&
+             exec mosquitto -c /mosquitto/config/mosquitto.conf"

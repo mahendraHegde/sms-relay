@@ -1,0 +1,8 @@
+# Mirrors the EMQX authorization rules in README.md (anything not listed is denied).
+user phone
+topic write smsrelay/up
+topic read smsrelay/down
+
+user reader
+topic write smsrelay/down
+topic read smsrelay/up

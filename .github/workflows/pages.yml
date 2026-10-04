@@ -1,0 +1,40 @@
+# Publishes the reader (reader/ only) to GitHub Pages on every push to main.
+# Serve it from an origin used for nothing else (custom subdomain or a dedicated organization):
+# pages sharing an origin can read each other's browser storage. See README, "Reader".
+name: Deploy reader to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["reader/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify vendored script hashes
+        run: |
+          cd reader/vendor
+          grep -oE '`[0-9a-f]{64}`' VENDOR.md | tr -d '`' > /tmp/expected
+          sha256sum mqtt.min.js qrcode.js | cut -d' ' -f1 > /tmp/actual
+          diff /tmp/expected /tmp/actual
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: reader
+      - id: deployment
+        uses: actions/deploy-pages@v4
