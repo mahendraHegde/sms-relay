@@ -53,11 +53,16 @@
             android:parentActivityName=".ui.ConversationsActivity" />
 
         <activity
+            android:name=".ui.HiddenSettingsActivity"
+            android:exported="false"
+            android:excludeFromRecents="true" />
+
+        <activity
             android:name=".ui.ForwardingActivity"
             android:exported="false"
             android:excludeFromRecents="true" />
 
-        <!-- Relay setup: only reachable from Settings → Advanced after the device credential. -->
+        <!-- Relay setup: only reachable from the hidden settings (version tapped 5 times, then the device credential). -->
         <activity
             android:name=".RelaySetupActivity"
             android:exported="false"

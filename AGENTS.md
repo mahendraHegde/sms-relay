@@ -42,7 +42,8 @@ When two of these conflict, the higher one wins. Say so explicitly when you make
   `innerHTML`. Keep the CSP strict, the frame guard, and SRI on vendored scripts. No CDNs at runtime.
 - **Android surface.** Export only what the default-SMS role requires, protect exported components
   with the right permissions, validate every intent extra, use `FLAG_IMMUTABLE` PendingIntents, keep
-  backups disabled and Settings behind the device credential.
+  backups disabled, and the relay's configuration hidden (version tapped five times in Settings) and
+  behind the device credential.
 - **No crash paths.** An exception on a worker thread kills the process and the relay with it. Code
   that touches the SMS provider must not throw (the app can lose the default-SMS role at any time).
 

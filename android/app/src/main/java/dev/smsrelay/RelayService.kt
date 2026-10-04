@@ -79,7 +79,7 @@ class RelayService : Service() {
             override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
                 if (network != current) return
                 val now = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-                // (e.g. Wi-Fi up before the router's internet after a power cut: retry when it validates)
+                // (e.g. Wi-Fi back before the router's internet after an outage: retry when it validates)
                 if (now && !validated && (everValidated || !Relay.connected())) {
                     Relay.internetBack(this@RelayService, replaceLive = everValidated)
                 }

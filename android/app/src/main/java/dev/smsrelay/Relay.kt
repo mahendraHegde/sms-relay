@@ -487,7 +487,7 @@ object Relay {
             .put("bat", if (level >= 0) level * 100 / scale else -1)
             .put("chg", charging(ctx))
             .put("role", ctx.getSystemService(RoleManager::class.java)?.isRoleHeld(RoleManager.ROLE_SMS) == true)
-            // Without the battery exemption, Doze cuts the relay off during power cuts.
+            // Without the battery exemption, Doze cuts the relay off while the phone is unplugged.
             .put("doze", ctx.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(ctx.packageName))
             .put("net", connectedOn)
             .put("up", (SystemClock.elapsedRealtime() - startedAt) / 1000)

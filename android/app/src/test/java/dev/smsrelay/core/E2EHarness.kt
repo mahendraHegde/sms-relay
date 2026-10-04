@@ -96,7 +96,7 @@ class E2EHarness {
             Triple("+15555550100", "<img src=x onerror=alert(1)> hi, call me ☎️", ProviderSms.TYPE_INBOX),
             Triple("+15555550100", "Calling you in 5 minutes", ProviderSms.TYPE_SENT),
             Triple("+15555550100", "Also, bring the", ProviderSms.TYPE_DRAFT),
-            Triple("EXBANK", "15.00 credited to account ending 0000.", ProviderSms.TYPE_INBOX),
+            Triple("EXBANK", "Payment of 15.00 received.", ProviderSms.TYPE_INBOX),
         )
         var i = 0
         val deadline = System.currentTimeMillis() + 20 * 60_000

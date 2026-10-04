@@ -101,7 +101,7 @@ class EnvelopeTest {
         val dir = File(System.getProperty("user.dir")!!).resolve("../../test-vectors").canonicalFile
         dir.mkdirs()
         val vectors = JSONArray()
-        val payload = JSONObject().put("t", "sms").put("id", "0".repeat(32)).put("addr", "EXBANK").put("body", "1,234.00 debited ✓")
+        val payload = JSONObject().put("t", "sms").put("id", "0".repeat(32)).put("addr", "EXBANK").put("body", "Card purchase 1,234.00 ✓")
         vectors.put(
             JSONObject()
                 .put("kind", 1)

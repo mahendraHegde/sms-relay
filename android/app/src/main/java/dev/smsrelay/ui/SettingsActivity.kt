@@ -1,44 +1,43 @@
 package dev.smsrelay.ui
 
 import android.app.Activity
+import android.app.KeyguardManager
 import android.app.role.RoleManager
 import android.content.Intent
 import android.os.Bundle
-import android.view.WindowManager
+import android.os.SystemClock
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import dev.smsrelay.BuildConfig
 import dev.smsrelay.R
-import dev.smsrelay.RelaySetupActivity
 
 /**
- * Settings. The whole screen is behind the device credential (ConversationsActivity asks before
- * opening it) and it closes as soon as it leaves the screen, so every visit asks again.
+ * Settings as anyone picking up the phone sees them: the default-SMS-app choice and the version.
+ * The relay's configuration is not shown here at all: tapping the version five times asks for the
+ * device credential and then opens HiddenSettingsActivity. No counter or hint gives the gesture away.
  */
 class SettingsActivity : Activity() {
     private companion object {
         const val REQ_ROLE = 2
+        const val REQ_UNLOCK = 3
+        const val TAPS = 5
+        const val TAP_WINDOW_MS = 3_000L
     }
 
     private lateinit var defaultRow: TextView
+    private val taps = LongArray(TAPS)
+    private var tapCount = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         title = getString(R.string.settings)
         actionBar?.setDisplayHomeAsUpEnabled(true)
-        defaultRow = row(getString(R.string.default_sms_app), "") { requestDefault() }
+        defaultRow = Ui.settingsRow(this, getString(R.string.default_sms_app), "") { requestDefault() }
         val col = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(defaultRow)
-            addView(row(getString(R.string.forwarding), getString(R.string.forwarding_hint)) {
-                startActivity(Intent(this@SettingsActivity, ForwardingActivity::class.java))
-            })
-            addView(row(getString(R.string.advanced), getString(R.string.advanced_hint)) {
-                startActivity(Intent(this@SettingsActivity, RelaySetupActivity::class.java))
-            })
-            addView(row(getString(R.string.about), getString(R.string.version, BuildConfig.VERSION_NAME)) {})
+            addView(Ui.settingsRow(this@SettingsActivity, getString(R.string.about), getString(R.string.version, BuildConfig.VERSION_NAME)) { onVersionTap() })
         }
         setContentView(ScrollView(this).apply { addView(col) })
     }
@@ -49,14 +48,34 @@ class SettingsActivity : Activity() {
         defaultRow.text = getString(R.string.default_sms_app) + "\n" + getString(if (held) R.string.yes else R.string.tap_to_set)
     }
 
-    override fun onStop() {
-        super.onStop()
-        if (!isChangingConfigurations) finish() // next visit asks for the screen lock again
-    }
-
     override fun onNavigateUp(): Boolean {
         finish()
         return true
+    }
+
+    /** Five taps within a few seconds: ask for the device credential, then open the hidden settings. */
+    private fun onVersionTap() {
+        val now = SystemClock.elapsedRealtime()
+        taps[tapCount++ % TAPS] = now
+        if (tapCount < TAPS || now - taps[tapCount % TAPS] > TAP_WINDOW_MS) return
+        tapCount = 0
+        val km = getSystemService(KeyguardManager::class.java)
+        @Suppress("DEPRECATION")
+        val confirm = km.createConfirmDeviceCredentialIntent(getString(R.string.advanced), null)
+        @Suppress("DEPRECATION")
+        if (confirm == null) openHidden() else startActivityForResult(confirm, REQ_UNLOCK) // no screen lock set: nothing to ask
+    }
+
+    private fun openHidden() {
+        HiddenSettingsActivity.unlocked = true
+        startActivity(Intent(this, HiddenSettingsActivity::class.java))
+    }
+
+    @Deprecated("Activity result API kept for minSdk without AndroidX")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_UNLOCK && resultCode == RESULT_OK) openHidden()
     }
 
     private fun requestDefault() {
@@ -65,16 +84,5 @@ class SettingsActivity : Activity() {
             @Suppress("DEPRECATION")
             startActivityForResult(rm.createRequestRoleIntent(RoleManager.ROLE_SMS), REQ_ROLE)
         }
-    }
-
-    private fun row(title: String, subtitle: String, onClick: () -> Unit) = TextView(this).apply {
-        text = if (subtitle.isEmpty()) title else "$title\n$subtitle"
-        textSize = 16f
-        val pad = Ui.dp(context, 20)
-        setPadding(pad, pad, pad, pad)
-        isClickable = true
-        isFocusable = true
-        setOnClickListener { onClick() }
-        foreground = context.getDrawable(android.R.drawable.list_selector_background)
     }
 }

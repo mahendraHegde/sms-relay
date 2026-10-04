@@ -31,6 +31,7 @@ class ForwardingActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!HiddenSettingsActivity.allowed(this)) return
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         title = getString(R.string.forwarding)
         actionBar?.setDisplayHomeAsUpEnabled(true)

@@ -22,7 +22,7 @@ import android.widget.TextView
 import android.widget.Toast
 
 /**
- * Relay setup (pairing, default-app and battery settings). Reached only from Settings → Advanced
+ * Relay setup (pairing, default-app and battery settings). Reached only from the hidden settings
  * after confirming the device credential; closes as soon as it leaves the screen.
  */
 class RelaySetupActivity : Activity() {
@@ -38,6 +38,7 @@ class RelaySetupActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!dev.smsrelay.ui.HiddenSettingsActivity.allowed(this)) return
         // Keeps the pairing code and broker password out of screenshots and the recents list.
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
 
@@ -157,7 +158,7 @@ class RelaySetupActivity : Activity() {
     }
 
     private fun openAutostart() {
-        // Xiaomi has a dedicated autostart screen; on other phones fall back to the app's settings.
+        // Some vendors (e.g. MIUI) have a dedicated autostart screen; elsewhere fall back to the app's settings.
         val vendorAutostart = Intent().setComponent(
             ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"),
         )

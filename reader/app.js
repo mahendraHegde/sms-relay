@@ -423,7 +423,7 @@ function showPairing() {
   screen(
     el("h1", {}, "Pair the phone"),
     el("ol", {},
-      el("li", {}, "On the phone, open Messages → Settings → Advanced (it asks for the screen lock) and finish steps 1 to 3."),
+      el("li", {}, "On the phone, open Messages → Settings, tap the version five times, confirm the screen lock, open Relay setup and finish steps 1 to 3."),
       el("li", {}, "Scan this QR with the phone camera (or any QR scanner app), copy the text, paste it in step 4 and tap Pair."),
       el("li", {}, "Compare the fingerprint below with the one on the phone."),
     ),
@@ -887,7 +887,7 @@ function renderStatus() {
     el("span", { class: reachable ? "ok" : "bad" }, reachable ? "Phone online" : `Phone unreachable (last seen ${ago(lastSeen)})`),
     s ? el("span", {}, `Battery ${s.bat}%${s.chg ? " charging" : " NOT charging"}`) : null,
     s && !s.role ? el("span", { class: "bad" }, "Phone app is NOT the default SMS app") : null,
-    s && s.doze === false ? el("span", { class: "bad" }, "Battery optimisation is ON for the app: it may stop during power cuts") : null,
+    s && s.doze === false ? el("span", { class: "bad" }, "Battery optimisation is ON for the app: it may stop while the phone is unplugged") : null,
     s && s.net === "cell" ? el("span", {}, "on mobile data") : null,
     s && s.queue ? el("span", {}, `${s.queue} waiting on phone`) : null,
     pending.size ? el("span", {}, `${pending.size} command(s) pending`) : null,
@@ -1124,7 +1124,7 @@ function renderAllow() {
   box.replaceChildren(
     ...(rows.length ? rows : [el("p", { class: "muted" }, phoneStatus ? "No numbers yet." : "Waiting for the phone to report its list…")]),
     el("p", { class: "hint" },
-      "To add a number: on the phone open Messages → Settings → Forwarding (it asks for the screen lock) and propose it. ",
+      "To add a number: on the phone open Messages → Settings, tap the version five times, confirm the screen lock, then Forwarding, and propose it. ",
       "It then shows here as waiting; approve it here. A number cannot be added from this page alone, and removing it on either side stops forwarding to it."),
   );
 }

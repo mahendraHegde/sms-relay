@@ -17,7 +17,7 @@ import dev.smsrelay.SmsSender
 import java.lang.ref.WeakReference
 
 /**
- * New message. Also what other apps open with SENDTO/SEND (sms:, smsto:), e.g. a bank app's
+ * New message. Also what other apps open with SENDTO/SEND (sms:, smsto:), e.g. an app's
  * "send this SMS to register" button, so recipient and text can arrive prefilled.
  */
 class ComposeActivity : Activity() {

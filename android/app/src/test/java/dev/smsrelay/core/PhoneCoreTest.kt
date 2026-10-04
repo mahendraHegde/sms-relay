@@ -511,9 +511,9 @@ class PhoneCoreTest {
     }
 
     @Test fun sameTextFromSameSenderAtAnotherTimeIsANewMessage() {
-        val old = receive("CARRIER", "Recharge now")
+        val old = receive("CARRIER", "Your plan renews soon")
         sms.rows.remove(old.providerId)
-        val reused = ProviderSms(old.providerId, "CARRIER", "Recharge now", clock + 86_400_000L, clock)
+        val reused = ProviderSms(old.providerId, "CARRIER", "Your plan renews soon", clock + 86_400_000L, clock)
         sms.rows[reused.providerId] = reused
         net.sent.clear()
         core.onRow(reused)

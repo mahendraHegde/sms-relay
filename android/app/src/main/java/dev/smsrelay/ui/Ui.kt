@@ -53,4 +53,16 @@ internal object Ui {
         else DateUtils.formatDateTime(ctx, ms, DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_MONTH)
 
     fun isIncoming(type: Int) = type == Telephony.Sms.MESSAGE_TYPE_INBOX
+
+    /** A tappable two-line row, as on a settings screen. */
+    fun settingsRow(ctx: Context, title: String, subtitle: String, onClick: () -> Unit) = TextView(ctx).apply {
+        text = if (subtitle.isEmpty()) title else "$title\n$subtitle"
+        textSize = 16f
+        val pad = dp(ctx, 20)
+        setPadding(pad, pad, pad, pad)
+        isClickable = true
+        isFocusable = true
+        setOnClickListener { onClick() }
+        foreground = ctx.getDrawable(android.R.drawable.list_selector_background)
+    }
 }

@@ -82,8 +82,10 @@ creates the reader's keys and shows a pairing QR code. It refuses to run inside 
 
 1. Install the APK (see Building), allowing "install unknown apps" for the file manager.
 2. Open **Messages**, make it the default SMS app when asked (or Settings → Default SMS app).
-3. Settings → **Advanced** (asks for the phone's PIN/pattern every time) opens the relay setup:
-   allow unrestricted battery use, and turn on autostart if the vendor has such a setting.
+3. Open the hidden relay settings: Settings → tap **About / Version** five times quickly → confirm
+   the phone's screen lock. Nothing in the app shows that these settings exist, and every visit
+   asks again. There, **Relay setup**: allow unrestricted battery use, and turn on autostart if the
+   vendor has such a setting.
 4. Scan the reader's QR code with the camera or any QR scanner, copy the text, paste it into the
    pairing field and tap **Pair**. The app clears the clipboard afterwards; clear the scanner's
    history too (the code contains the phone's broker password).
@@ -101,8 +103,8 @@ creates the reader's keys and shows a pairing QR code. It refuses to run inside 
   otherwise the phone itself uploads your messages.
 - Lock screen: hide notification content.
 - Grant the battery exemption (step 3). Vendor battery managers kill background apps
-  aggressively; see <https://dontkillmyapp.com> for your phone's settings (on Xiaomi/MIUI:
-  autostart on, battery saver "No restrictions", lock the app in recents).
+  aggressively; see <https://dontkillmyapp.com> for your phone's settings (typically: allow
+  autostart, set the battery saver to "No restrictions", lock the app in recents).
 - Developer options: **Mobile data always active** keeps a fallback when Wi-Fi is connected but
   has no internet. Leave USB debugging off.
 - Remove apps you don't need, especially if the phone no longer gets security updates.
@@ -129,7 +131,7 @@ locked until someone unlocks the phone once; the reader shows "Phone unreachable
 
 **On the phone** it is a normal messaging app: conversations, replies, drafts (kept when you
 leave a conversation), notifications for new messages, long-press to delete a message or a
-conversation. Apps that open the SMS composer (e.g. a bank's registration flow) work too.
+conversation. Apps that open the SMS composer (e.g. one that verifies your number by sending an SMS) work too.
 
 **In the reader:**
 
@@ -148,8 +150,8 @@ conversation. Apps that open the SMS composer (e.g. a bank's registration flow) 
 
 The phone can forward chosen incoming SMS to other numbers, e.g. bank codes to a second phone.
 
-1. **Propose the number on the phone:** Messages → Settings (asks for the screen lock) →
-   Forwarding → enter the number → Propose.
+1. **Propose the number on the phone:** Messages → Settings → tap the version five times →
+   screen lock → Forwarding → enter the number → Propose.
 2. **Approve it in the reader:** Forwarding → Approved numbers → Approve. Approve only numbers
    you expect: the two steps mean neither the phone alone nor the reader alone can add one.
 3. **Write a rule in the reader:** Forwarding → Add a rule. Pick conditions on the sender or the

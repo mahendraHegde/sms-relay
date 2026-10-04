@@ -137,24 +137,12 @@ class ConversationsActivity : Activity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId != 1) return super.onOptionsItemSelected(item)
-        // All of Settings is behind the screen lock.
-        val km = getSystemService(android.app.KeyguardManager::class.java)
-        @Suppress("DEPRECATION")
-        val confirm = km.createConfirmDeviceCredentialIntent(getString(R.string.settings), null)
-        @Suppress("DEPRECATION")
-        if (confirm == null) startActivity(Intent(this, SettingsActivity::class.java)) else startActivityForResult(confirm, REQ_SETTINGS)
+        // Ordinary settings; the relay's configuration is hidden behind a gesture and the screen lock there.
+        startActivity(Intent(this, SettingsActivity::class.java))
         return true
     }
 
-    @Deprecated("Activity result API kept for minSdk without AndroidX")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        @Suppress("DEPRECATION")
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQ_SETTINGS && resultCode == RESULT_OK) startActivity(Intent(this, SettingsActivity::class.java))
-    }
-
     private companion object {
-        const val REQ_SETTINGS = 7
         const val REQ_ROLE = 8
     }
 
