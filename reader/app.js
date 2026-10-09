@@ -46,7 +46,13 @@ function serially(fn) {
 }
 const msgs = new Map();
 const pending = new Map();
-const selected = new Set();
+const selected = new Set(); // message ids ticked in a conversation or in search results
+// Conversations ticked in the list: address -> when it was ticked. Only messages already here at that
+// moment are selected, so a message arriving afterwards (an unread code) is never deleted unseen.
+const selectedConvs = new Map();
+
+/** A content-free record left in place of a removed message, so a replayed copy is not shown again. */
+const tomb = (id, phone, addr = "") => ({ id, removed: true, addr, body: "", phone });
 let phoneStatus = null;
 let lastSeen = 0; // when a status newer than any before it arrived (replays do not count)
 let heardSinceConnect = false; // a fresh status arrived over the current connection
@@ -576,8 +582,9 @@ function expire(id, c) {
 }
 
 /** Persist the command together with any message updates (atomically), then send it. */
-async function queueCommand(payload, msgUpdates = []) {
-  const c = { payload, created: Date.now() };
+/** [meta] stays in this reader (e.g. purge: also remove the archive copy once the phone confirms). */
+async function queueCommand(payload, msgUpdates = [], meta = {}) {
+  const c = { payload, created: Date.now(), ...meta };
   await vault.batch([{ store: "cmds", key: payload.cmd, value: c }, ...msgUpdates.map((m) => ({ store: "msgs", key: m.id, value: m }))]);
   pending.set(payload.cmd, c);
   for (const m of msgUpdates) msgs.set(m.id, m);
@@ -621,11 +628,11 @@ function onGone(m) {
       if (rec?.removed) continue;
       // Never received here: keep a tombstone so a late or replayed copy is not shown as present.
       if (!rec) {
-        updated.push({ id, removed: true, addr: "", body: "", phone: "gone" });
+        updated.push(tomb(id, "gone"));
         continue;
       }
       // A replaced draft just disappears; anything else stays, marked as deleted on the phone.
-      updated.push(rec.kind === "draft" ? { id, removed: true, addr: addrOf(rec), body: "", phone: "gone" } : { ...rec, phone: "gone" });
+      updated.push(rec.kind === "draft" ? tomb(id, "gone", addrOf(rec)) : { ...rec, phone: "gone" });
     }
     if (updated.length) await vault.batch(updated.map((u) => ({ store: "msgs", key: u.id, value: u })));
     for (const u of updated) msgs.set(u.id, u);
@@ -737,7 +744,12 @@ async function onResult(m) {
         const rec = msgs.get(id);
         if (!rec) continue;
         const r = m.res[id];
-        updated.push({ ...rec, phone: ["deleted", "absent", "mismatch", "error"].includes(r) ? r : "error" });
+        const state = ["deleted", "absent", "mismatch", "error"].includes(r) ? r : "error";
+        // A "Delete" from this reader also removes our copy once the phone confirms it deleted the row.
+        // "absent" can also mean the phone has no record of the id (e.g. after its data was reset)
+        // while the SMS is still there, so that copy stays, marked, like a refused or failed delete.
+        if (c.purge && state === "deleted") updated.push(tomb(id, state));
+        else updated.push({ ...rec, phone: state });
       }
       await vault.batch([{ store: "cmds", key: c.payload.cmd, del: true }, ...updated.map((u) => ({ store: "msgs", key: u.id, value: u }))]);
       for (const u of updated) msgs.set(u.id, u);
@@ -811,9 +823,9 @@ function showMain() {
     // Appears at the bottom of the screen while messages are selected (thumb-reachable on phones).
     el("div", { id: "selbar", class: "selbar", hidden: true },
       el("span", { id: "selcount" }),
-      el("button", { id: "del", on: { click: deleteSelected } }, "Delete on phone"),
-      el("button", { class: "secondary", on: { click: removeSelected } }, "Remove from archive"),
-      el("button", { class: "link", on: { click: () => { selected.clear(); renderMain(); } } }, "Cancel"),
+      el("button", { id: "del", on: { click: deleteSelected } }, "Delete"),
+      el("button", { class: "secondary", on: { click: removeSelected } }, "Remove from reader only"),
+      el("button", { class: "link", on: { click: () => { clearSelection(); renderMain(); } } }, "Cancel"),
     ),
     el("details", { class: "more" },
       el("summary", {}, "More"),
@@ -870,11 +882,31 @@ function renderMain() {
   renderSelbar();
 }
 
+function clearSelection() {
+  selected.clear();
+  selectedConvs.clear();
+}
+
+/** Ids of every message selected, directly or through a selected conversation (removed ones excluded). */
+function selectedIds() {
+  const ids = new Set(selected);
+  if (selectedConvs.size) {
+    for (const m of msgs.values()) {
+      const at = selectedConvs.get(addrOf(m));
+      if (at != null && !m.removed && (m.got ?? 0) <= at) ids.add(m.id);
+    }
+  }
+  return [...ids].filter((id) => msgs.has(id) && !msgs.get(id).removed);
+}
+
 function renderSelbar() {
   const bar = document.getElementById("selbar");
   if (!bar) return;
-  bar.hidden = selected.size === 0;
-  document.getElementById("selcount").textContent = `${selected.size} selected`;
+  const n = selectedIds().length;
+  bar.hidden = selected.size === 0 && selectedConvs.size === 0;
+  document.getElementById("selcount").textContent = selectedConvs.size
+    ? `${selectedConvs.size} conversation(s), ${n} message(s) selected`
+    : `${n} selected`;
 }
 
 function renderStatus() {
@@ -937,9 +969,33 @@ function renderConversations(list, live) {
   const convs = [...latest.entries()].sort((a, b) => when(b[1].last) - when(a[1].last));
   list.replaceChildren(...(convs.length
     ? paged(convs, ([addr, { last, count }]) => el("div", {
-        class: "conv",
-        on: { click: () => { view = { addr }; selected.clear(); shown = PAGE; renderMain(); } },
+        class: "conv" + (selectedConvs.has(addr) ? " picked" : ""),
+        on: {
+          click: () => {
+            // While conversations are being selected, tapping a row toggles it (a missed checkbox tap
+            // must not throw the selection away); otherwise it opens the conversation.
+            if (selectedConvs.size) {
+              if (selectedConvs.has(addr)) selectedConvs.delete(addr);
+              else selectedConvs.set(addr, Date.now());
+              return renderMain();
+            }
+            view = { addr };
+            clearSelection();
+            shown = PAGE;
+            renderMain();
+          },
+        },
       },
+        (() => {
+          // Ticking selects the whole conversation (for Delete); the rest of the row opens it.
+          const box = el("input", { type: "checkbox", checked: selectedConvs.has(addr), title: "Select conversation" });
+          box.addEventListener("change", () => {
+            if (box.checked) selectedConvs.set(addr, Date.now());
+            else selectedConvs.delete(addr);
+            renderMain();
+          });
+          return el("label", { class: "sel conv-sel", on: { click: (e) => e.stopPropagation() } }, box);
+        })(),
         el("div", { class: "avatar" }, (addr.match(/[A-Za-z0-9]/)?.[0] ?? "#").toUpperCase()),
         el("div", { class: "conv-text" },
           el("div", { class: "conv-top" }, el("strong", {}, addr), el("span", { class: "muted" }, fmtTime(when(last)))),
@@ -958,7 +1014,7 @@ function renderThread(list, items) {
   const more = page.length > Math.min(items.length, shown) ? [page.pop()] : [];
   list.replaceChildren(
     el("div", { class: "thread-head" },
-      el("button", { class: "link", on: { click: () => { view = { addr: null }; selected.clear(); renderMain(); } } }, "← Conversations"),
+      el("button", { class: "link", on: { click: () => { view = { addr: null }; clearSelection(); renderMain(); } } }, "← Conversations"),
       el("strong", {}, view.addr),
     ),
     ...more,
@@ -993,32 +1049,43 @@ function messageCard(m, showAddr) {
   );
 }
 
+/**
+ * Delete: on the phone, then from this reader once the phone confirms. Messages already gone from the
+ * phone are just removed here; ones with a delete still pending are left alone.
+ */
 async function deleteSelected() {
-  const ids = [...selected].filter((id) => {
-    const p = msgs.get(id)?.phone;
-    return p === "present" || p === "error" || p === "mismatch";
-  });
-  if (!ids.length) return;
-  if (!confirm(`Delete ${ids.length} message(s) from the phone? This cannot be undone.`)) return;
-  for (let i = 0; i < ids.length; i += MAX_IDS) {
-    const chunk = ids.slice(i, i + MAX_IDS);
-    await serially(() => queueCommand(cmd("delete", { ids: chunk }), chunk.map((id) => ({ ...msgs.get(id), phone: "pending" }))));
+  const all = selectedIds();
+  const onPhone = all.filter((id) => ["present", "error", "mismatch"].includes(msgs.get(id).phone));
+  const gone = all.filter((id) => ["deleted", "gone", "absent"].includes(msgs.get(id).phone));
+  if (!onPhone.length && !gone.length) {
+    warning = "Nothing to delete: the selected messages are already being deleted.";
+    return renderStatus();
   }
-  selected.clear();
+  if (!confirm(`Delete ${onPhone.length + gone.length} message(s) from the phone and from this reader? This cannot be undone.`)) return;
+  for (let i = 0; i < onPhone.length; i += MAX_IDS) {
+    const chunk = onPhone.slice(i, i + MAX_IDS);
+    await serially(() => queueCommand(cmd("delete", { ids: chunk }), chunk.map((id) => ({ ...msgs.get(id), phone: "pending" })), { purge: true }));
+  }
+  if (gone.length) await tombstone(gone);
+  clearSelection();
   renderMain();
 }
 
-async function removeSelected() {
-  const ids = [...selected];
-  if (!ids.length) return;
-  if (!confirm(`Remove ${ids.length} message(s) from this archive only? They stay on the phone unless deleted there.`)) return;
-  await serially(async () => {
-    // Keep a tombstone without content so a replayed or re-sent copy is not shown again.
-    const tombs = ids.map((id) => ({ id, removed: true, addr: "", body: "", phone: msgs.get(id)?.phone }));
+/** Remove from this reader only, keeping a content-free tombstone so a replayed copy is not shown again. */
+function tombstone(ids) {
+  return serially(async () => {
+    const tombs = ids.map((id) => tomb(id, msgs.get(id)?.phone));
     await vault.batch(tombs.map((t) => ({ store: "msgs", key: t.id, value: t })));
     for (const t of tombs) msgs.set(t.id, t);
   });
-  selected.clear();
+}
+
+async function removeSelected() {
+  const ids = selectedIds();
+  if (!ids.length) return;
+  if (!confirm(`Remove ${ids.length} message(s) from this reader only? They stay on the phone unless deleted there.`)) return;
+  await tombstone(ids);
+  clearSelection();
   renderMain();
 }
 

@@ -139,12 +139,13 @@ conversation. Apps that open the SMS composer (e.g. one that verifies your numbe
 
 - Conversations with incoming messages on the left and sent messages and drafts on the right.
   Messages that arrived while the reader was closed come within a minute of opening it.
-- Select messages to **Delete on phone** (any kind: incoming, sent, drafts). The result shows
-  per message; a delete is refused (`changed on phone`) if the message on the phone no longer
-  matches what was relayed.
-- Messages deleted on the phone itself are marked "deleted on the phone"; replaced drafts
-  disappear.
-- **Remove from archive** only removes a message from this browser.
+- Tick messages, or whole conversations in the conversation list, and **Delete**: they are deleted
+  on the phone (any kind: incoming, sent, drafts) and removed from the reader once the phone
+  confirms. A delete is refused (`changed on phone`) if the message on the phone no longer matches
+  what was relayed; it then stays in the reader, marked, so you can retry.
+- Messages deleted on the phone itself stay in the reader as a record, marked "deleted on the
+  phone"; replaced drafts disappear. Select them and **Delete** to remove them from the reader.
+- **Remove from reader only** removes messages from this browser and leaves the phone untouched.
 - The status line warns if the phone is unreachable, not the default SMS app, not charging, or
   missing the battery exemption.
 

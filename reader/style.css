@@ -123,7 +123,7 @@ h2 { font-size: 1.1rem; margin: 1.4em 0 0.4em; }
 @media (max-width: 480px) {
   main { padding: 12px; }
   .bubble { max-width: 85%; }
-  .msg .sel input[type="checkbox"] { width: 22px; height: 22px; }
+  .msg .sel input[type="checkbox"], .conv-sel input[type="checkbox"] { width: 24px; height: 24px; }
 }
 
 header .actions, .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -168,3 +168,5 @@ h3 { font-size: 1rem; margin: 1.2em 0 0.4em; }
   .cond button.link { grid-column: 1 / -1; justify-self: start; }
 }
 .match { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0; }
+.conv-sel { flex: none; display: flex; align-items: center; padding: 4px; }
+.conv.picked { background: var(--card); box-shadow: inset 3px 0 0 var(--accent); }
