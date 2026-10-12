@@ -132,8 +132,10 @@ locked until someone unlocks the phone once; the reader shows "Phone unreachable
 ## Daily use
 
 **On the phone** it is a normal messaging app: conversations, replies, drafts (kept when you
-leave a conversation), notifications for new messages, long-press to delete a message or a
-conversation. Apps that open the SMS composer (e.g. one that verifies your number by sending an SMS) work too.
+leave a conversation), notifications for new messages with a **Mark as read** button (deliberately no Delete button, so
+a stray tap cannot remove a message), long-press to delete a message or a
+conversation. With the contacts permission (asked once; optional) saved contacts show by name,
+and the name travels with each message to the reader inside the encryption. Apps that open the SMS composer (e.g. one that verifies your number by sending an SMS) work too.
 
 **In the reader:**
 
@@ -235,7 +237,6 @@ deletion on the phone for `/tmp/e2e/localdelete`, and stops on `/tmp/e2e/stop`. 
 
 - MMS are not supported (they are dropped). One-time passwords and most service messages are
   plain SMS.
-- Contacts are shown as phone numbers.
 - The reader cannot send SMS (by design); forwarding only copies incoming SMS to approved numbers.
 - If the broker deployment is stopped (e.g. quota exhausted by someone with a leaked password),
   the broker-move feature cannot reach the phone until it runs again.

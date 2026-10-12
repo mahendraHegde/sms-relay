@@ -170,3 +170,4 @@ h3 { font-size: 1rem; margin: 1.2em 0 0.4em; }
 .match { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0; }
 .conv-sel { flex: none; display: flex; align-items: center; padding: 4px; }
 .conv.picked { background: var(--card); box-shadow: inset 3px 0 0 var(--accent); }
+.conv-num { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

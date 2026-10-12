@@ -713,6 +713,8 @@ async function onSms(m) {
     // A copy the phone sent because of a forwarding rule: the rule's name and the original message.
     if (typeof m.rule === "string" && m.rule) rec.rule = m.rule.slice(0, R.LIMITS.name);
     if (/^[0-9a-f]{32}$/.test(String(m.fwdOf || ""))) rec.fwdOf = m.fwdOf;
+    // The phone's saved contact name for this number, if any.
+    if (typeof m.name === "string" && m.name.trim()) rec.name = m.name.trim().slice(0, 64);
     saving.add(id);
     try {
       await serially(async () => {
@@ -935,12 +937,25 @@ let fwdTargets = new Map(); // original message id -> numbers a rule forwarded i
 const KIND_LABEL = { sent: "Sent", draft: "Draft", failed: "Not sent" };
 
 /** Conversation list, one conversation, or (while searching) matching messages from all of them. */
+/**
+ * Contact name per address, from the newest message only: if that one carries no name (contact
+ * deleted, permission revoked, number now someone else's), the number shows again.
+ */
+let names = new Map();
+const label = (addr) => names.get(addr) || addr;
+
 function renderList() {
   const list = document.getElementById("list");
   const live = [...msgs.values()].filter((m) => !m.removed);
+  const newest = new Map();
+  for (const m of live) {
+    const a = addrOf(m);
+    if (!newest.has(a) || when(m) > when(newest.get(a))) newest.set(a, m);
+  }
+  names = new Map([...newest].filter(([, m]) => m.name).map(([a, m]) => [a, m.name]));
   if (filter) {
     const hits = live
-      .filter((m) => addrOf(m).toLowerCase().includes(filter) || m.body.toLowerCase().includes(filter))
+      .filter((m) => addrOf(m).toLowerCase().includes(filter) || label(addrOf(m)).toLowerCase().includes(filter) || m.body.toLowerCase().includes(filter))
       .sort((a, b) => when(b) - when(a));
     return list.replaceChildren(...paged(hits, (m) => messageCard(m, true)), ...(hits.length ? [] : [el("p", { class: "muted" }, "No matches.")]));
   }
@@ -996,9 +1011,10 @@ function renderConversations(list, live) {
           });
           return el("label", { class: "sel conv-sel", on: { click: (e) => e.stopPropagation() } }, box);
         })(),
-        el("div", { class: "avatar" }, (addr.match(/[A-Za-z0-9]/)?.[0] ?? "#").toUpperCase()),
+        el("div", { class: "avatar" }, (label(addr).match(/[\p{L}\p{N}]/u)?.[0] ?? "#").toUpperCase()),
         el("div", { class: "conv-text" },
-          el("div", { class: "conv-top" }, el("strong", {}, addr), el("span", { class: "muted" }, fmtTime(when(last)))),
+          el("div", { class: "conv-top" }, el("strong", {}, label(addr)), el("span", { class: "muted" }, fmtTime(when(last)))),
+          names.has(addr) ? el("div", { class: "muted small conv-num" }, addr) : null,
           el("div", { class: "muted conv-snippet" },
             last.kind === "draft" ? "Draft: " : last.kind === "sent" || last.kind === "failed" ? "You: " : "",
             last.body),
@@ -1015,7 +1031,8 @@ function renderThread(list, items) {
   list.replaceChildren(
     el("div", { class: "thread-head" },
       el("button", { class: "link", on: { click: () => { view = { addr: null }; clearSelection(); renderMain(); } } }, "← Conversations"),
-      el("strong", {}, view.addr),
+      el("strong", {}, label(view.addr)),
+      names.has(view.addr) ? el("span", { class: "muted small" }, view.addr) : null,
     ),
     ...more,
     ...page.reverse(),
@@ -1035,7 +1052,7 @@ function messageCard(m, showAddr) {
   return el("div", { class: `msg ${kind === "in" ? "in" : "out"}` + (m.phone === "deleted" || m.phone === "gone" ? " gone" : "") },
     el("label", { class: "sel" }, box),
     el("div", { class: `bubble ${kind}` },
-      showAddr ? el("div", { class: "meta" }, el("strong", {}, addrOf(m))) : null,
+      showAddr ? el("div", { class: "meta" }, el("strong", {}, label(addrOf(m))), names.has(addrOf(m)) ? el("span", { class: "muted" }, addrOf(m)) : null) : null,
       el("div", { class: "body" }, m.body),
       m.cut ? el("div", { class: "muted" }, `(${m.cut} characters cut: message too long to relay)`) : null,
       el("div", { class: "meta" },

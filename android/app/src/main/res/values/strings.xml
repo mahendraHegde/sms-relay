@@ -25,6 +25,7 @@
     <string name="messages_channel">Messages</string>
     <string name="advanced_hint">Sync and pairing</string>
     <string name="relay_setup">Relay setup</string>
+    <string name="mark_read">Mark as read</string>
     <string name="forwarding">Forwarding</string>
     <string name="forwarding_hint">Rules and approved numbers</string>
     <string name="allowlist">Approved numbers</string>

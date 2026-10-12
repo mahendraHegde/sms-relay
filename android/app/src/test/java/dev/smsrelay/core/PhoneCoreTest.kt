@@ -466,6 +466,52 @@ class PhoneCoreTest {
         assertTrue(outbox.isEmpty())
     }
 
+    @Test fun contactNamesTravelWithTheMessageWhenKnown() {
+        val named = PhoneCore(
+            Keys(phoneSig, phoneEnc, readerSig.generatePublicKey().encoded, readerEnc.generatePublicKey().encoded),
+            sms, store, net, { JSONObject() }, { clock },
+            nameOf = { if (it == "+15555550100") "  Test Contact  " else null },
+        )
+        named.confirmPairing()
+        named.onDown(cmd("hello").second)
+        net.sent.clear()
+        named.onRow(sms.add("+15555550100", "hi", clock))
+        named.onRow(sms.add("EXBANK", "OTP 1", clock))
+        val sent = upMessages().filter { it.optString("t") == "sms" }
+        assertEquals("Test Contact", sent.single { it.getString("addr") == "+15555550100" }.getString("name"))
+        assertFalse(sent.single { it.getString("addr") == "EXBANK" }.has("name"))
+    }
+
+    @Test fun contactNamesAreCappedAndBlankOnesDropped() {
+        val long = "N".repeat(PhoneCore.MAX_NAME - 1) + "😀😀"
+        val named = PhoneCore(
+            Keys(phoneSig, phoneEnc, readerSig.generatePublicKey().encoded, readerEnc.generatePublicKey().encoded),
+            sms, store, net, { JSONObject() }, { clock },
+            nameOf = { if (it == "+15555550100") long else "   " },
+        )
+        named.confirmPairing()
+        named.onDown(cmd("hello").second)
+        net.sent.clear()
+        named.onRow(sms.add("+15555550100", "hi", clock))
+        named.onRow(sms.add("+15555550199", "hi", clock))
+        val sent = upMessages().filter { it.optString("t") == "sms" }
+        val name = sent.single { it.getString("addr") == "+15555550100" }.getString("name")
+        assertTrue(name.length <= PhoneCore.MAX_NAME && !name.last().isHighSurrogate())
+        assertFalse(sent.single { it.getString("addr") == "+15555550199" }.has("name"))
+    }
+
+    @Test fun aFailingContactLookupNeverBlocksRelaying() {
+        val broken = PhoneCore(
+            Keys(phoneSig, phoneEnc, readerSig.generatePublicKey().encoded, readerEnc.generatePublicKey().encoded),
+            sms, store, net, { JSONObject() }, { clock }, nameOf = { throw SecurityException("no contacts permission") },
+        )
+        broken.confirmPairing()
+        broken.onDown(cmd("hello").second)
+        net.sent.clear()
+        broken.onRow(sms.add("+15555550100", "hi", clock))
+        assertFalse(upMessages().single { it.optString("t") == "sms" }.has("name"))
+    }
+
     @Test fun helloReplayStaysRejectedAcrossCoreRebuilds() {
         val guard = CoreState()
         fun newCore() = PhoneCore(

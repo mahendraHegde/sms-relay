@@ -77,7 +77,8 @@ Then, in the reader:
 ## 4. Phone
 
 1. Open **Messages** and accept **Set as default SMS app**. The app now receives all SMS and shows
-   notifications like any messaging app.
+   notifications like any messaging app. Allow **Contacts** when asked if you want saved contacts
+   shown by name, on the phone and in the reader (optional; refused means numbers).
 2. Open the hidden relay settings: **menu → Settings**, tap **About / Version** five times quickly,
    then confirm the phone's screen lock. Nothing in the app shows that these settings exist, and
    every visit asks again.

@@ -45,7 +45,7 @@ object Notifier {
             .build()
         val n = Notification.Builder(ctx, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_message)
-            .setContentTitle(sms.address)
+            .setContentTitle(dev.smsrelay.Contacts.nameOf(ctx, sms.address) ?: sms.address)
             .setContentText(sms.body)
             .setStyle(Notification.BigTextStyle().bigText(sms.body))
             .setWhen(sms.date)
@@ -56,8 +56,24 @@ object Notifier {
             .setContentIntent(open)
             .setAutoCancel(true)
             .setExtras(android.os.Bundle().apply { putLong(EXTRA_PID, sms.providerId) })
+            // No Delete button on purpose: one stray tap would remove the message from the phone.
+            .addAction(markReadAction(ctx, threadId))
             .build()
         runCatching { nm.notify(TAG, threadId.toInt(), n) } // no permission (Android 13+ denied): just no notification
+    }
+
+    /** "Mark as read": one PendingIntent per conversation (the thread id is in the intent's data, so they never collide). */
+    private fun markReadAction(ctx: Context, threadId: Long): Notification.Action {
+        val pi = PendingIntent.getBroadcast(
+            ctx, 0,
+            Intent(ctx, NotificationActionReceiver::class.java).setAction(NotificationActionReceiver.ACTION_READ)
+                .setData(android.net.Uri.parse("smsrelay://thread/$threadId"))
+                .putExtra(NotificationActionReceiver.EXTRA_THREAD, threadId),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        return Notification.Action.Builder(android.graphics.drawable.Icon.createWithResource(ctx, R.drawable.ic_stat_message), ctx.getString(R.string.mark_read), pi)
+            .apply { if (android.os.Build.VERSION.SDK_INT >= 31) setAuthenticationRequired(true) } // unlock first, where Android supports it
+            .build()
     }
 
     fun clear(ctx: Context, threadId: Long) {

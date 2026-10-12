@@ -145,6 +145,17 @@ object SmsSender {
         Relay.rowsDeleted(ctx, providerIds) // the relay checks which rows are really gone
     }
 
+    /** Mark a conversation's unread messages read (opening it, or "Mark as read" on a notification). */
+    fun markRead(ctx: Context, threadId: Long) {
+        runCatching {
+            ctx.contentResolver.update(
+                Telephony.Sms.CONTENT_URI,
+                ContentValues().apply { put(Telephony.Sms.READ, 1); put(Telephony.Sms.SEEN, 1) },
+                "${Telephony.Sms.THREAD_ID} = ? AND ${Telephony.Sms.READ} = 0", arrayOf(threadId.toString()),
+            )
+        }
+    }
+
     /** All message ids of a conversation (for deleting it). */
     fun threadRows(ctx: Context, threadId: Long): List<Long> =
         ctx.contentResolver.query(

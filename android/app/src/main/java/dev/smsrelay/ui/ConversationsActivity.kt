@@ -28,6 +28,8 @@ import dev.smsrelay.SmsSender
 class ConversationsActivity : Activity() {
     private data class Conversation(
         val threadId: Long, val address: String, val snippet: String, val date: Long, val unread: Int, val draft: Boolean,
+        /** Saved contact name, if any. */
+        val name: String? = null,
     )
 
     private val main = Handler(Looper.getMainLooper())
@@ -58,7 +60,7 @@ class ConversationsActivity : Activity() {
             setOnItemLongClickListener { _, _, pos, _ ->
                 val c = this@ConversationsActivity.adapter.items[pos]
                 AlertDialog.Builder(this@ConversationsActivity)
-                    .setMessage(getString(R.string.delete_conversation, c.address))
+                    .setMessage(getString(R.string.delete_conversation, c.name ?: c.address))
                     .setPositiveButton(R.string.delete) { _, _ ->
                         Ui.io.execute { runCatching { SmsSender.deleteRows(this@ConversationsActivity, SmsSender.threadRows(this@ConversationsActivity, c.threadId)) } }
                     }
@@ -95,11 +97,18 @@ class ConversationsActivity : Activity() {
         super.onResume()
         // Android 13+ asks before showing notifications (Android 10 does not need this).
         val prefs = getSharedPreferences("ui", MODE_PRIVATE)
-        if (android.os.Build.VERSION.SDK_INT >= 33 && !prefs.getBoolean("asked_notifications", false) &&
-            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
-        ) {
-            prefs.edit().putBoolean("asked_notifications", true).apply() // ask once, not on every resume
-            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
+        // Contacts: ask once, for names instead of numbers; refused means numbers, nothing else changes.
+        val ask = buildList {
+            if (android.os.Build.VERSION.SDK_INT >= 33 && !prefs.getBoolean("asked_notifications", false) &&
+                checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) add(android.Manifest.permission.POST_NOTIFICATIONS)
+            if (!prefs.getBoolean("asked_contacts", false) && !dev.smsrelay.Contacts.canRead(this@ConversationsActivity)) {
+                add(android.Manifest.permission.READ_CONTACTS)
+            }
+        }
+        if (ask.isNotEmpty()) {
+            prefs.edit().putBoolean("asked_notifications", true).putBoolean("asked_contacts", true).apply() // once, not on every resume
+            requestPermissions(ask.toTypedArray(), REQ_PERMS)
         }
         // Until the app is the default SMS app it cannot read messages (the role grants that), and
         // touching the provider would throw: offer to set it instead.
@@ -142,7 +151,13 @@ class ConversationsActivity : Activity() {
         return true
     }
 
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQ_PERMS && observing) load() // contacts granted: show names now
+    }
+
     private companion object {
+        const val REQ_PERMS = 1
         const val REQ_ROLE = 8
     }
 
@@ -172,7 +187,7 @@ class ConversationsActivity : Activity() {
                 }
             }
         }
-        return latest.values.map { it.copy(unread = unread[it.threadId] ?: 0) }
+        return latest.values.map { it.copy(unread = unread[it.threadId] ?: 0, name = dev.smsrelay.Contacts.nameOf(this, it.address)) }
     }
 
     private inner class Adapter : BaseAdapter() {
@@ -194,7 +209,7 @@ class ConversationsActivity : Activity() {
             val pad = Ui.dp(ctx, 16)
             val bold = c.unread > 0
             val name = TextView(ctx).apply {
-                text = c.address
+                text = c.name ?: c.address
                 textSize = 16f
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
@@ -228,7 +243,7 @@ class ConversationsActivity : Activity() {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(pad, Ui.dp(ctx, 12), pad, Ui.dp(ctx, 12))
-                addView(Ui.avatar(ctx, c.address))
+                addView(Ui.avatar(ctx, c.name ?: c.address))
                 addView(texts, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             }
         }

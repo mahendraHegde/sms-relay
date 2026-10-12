@@ -341,7 +341,7 @@ object Relay {
         val transport = MqttTransport(appCtx, pairing, secrets.clientId, keepAlive, exec)
         val keys = Keys(secrets.phoneSig, secrets.phoneEnc, pairing.readerSigPub, pairing.readerEncPub)
         val c = PhoneCore(keys, AndroidSmsStore(appCtx), database, transport, { status(appCtx) }, state = coreState,
-            smsOut = { to, text -> SmsSender.sendForId(appCtx, to, text) }, onRebroker = { code, moveCmd ->
+            smsOut = { to, text -> SmsSender.sendForId(appCtx, to, text) }, nameOf = { Contacts.nameOf(appCtx, it) }, onRebroker = { code, moveCmd ->
             // Give the "ok" result a moment to leave on the current broker, then switch.
             val w = Power.awake(appCtx, 10_000, "rebroker")
             exec.schedule({

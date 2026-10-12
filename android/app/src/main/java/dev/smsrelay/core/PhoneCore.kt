@@ -133,6 +133,8 @@ class PhoneCore(
     private val state: CoreState = CoreState(),
     /** How forwarded messages leave the phone; null disables forwarding (tests, unpaired). */
     private val smsOut: SmsOut? = null,
+    /** Saved contact name for an address, relayed with each message so the reader can show it. */
+    private val nameOf: (String) -> String? = { null },
 ) {
     companion object {
         const val META_CONFIRMED = "pair_confirmed"
@@ -176,6 +178,8 @@ class PhoneCore(
          */
         fun confirmsMove(msg: JSONObject?, candidateCmd: String): Boolean =
             msg != null && candidateCmd.isNotEmpty() && msg.optString("t") == "hello" && msg.optString("moved") == candidateCmd
+        /** Longest contact name relayed with a message. */
+        const val MAX_NAME = 64
         /** Largest sms JSON before padding; leaves room under Envelope's 64 KiB ceiling. */
         const val MAX_SMS_JSON = 60_000
     }
@@ -602,6 +606,9 @@ class PhoneCore(
 
     /** The sms payload, with the body cut (and `cut` = chars dropped) if it would not fit an envelope. */
     private fun smsPayload(id: String, gen: String, s: ProviderSms): JSONObject {
+        val name = runCatching { nameOf(s.address) }.getOrNull()?.trim()
+            ?.let { if (it.length <= MAX_NAME) it else it.take(MAX_NAME).let { t -> if (t.last().isHighSurrogate()) t.dropLast(1) else t } }
+            ?.ifEmpty { null }
         var keep = s.body.length
         while (true) {
             val p = JSONObject()
@@ -609,6 +616,7 @@ class PhoneCore(
                 .put("addr", s.address.take(256)).put("body", s.body.substring(0, keep))
                 .put("sent", s.dateSent).put("rcvd", s.date).put("ts", now())
             if (keep < s.body.length) p.put("cut", s.body.length - keep)
+            name?.let { p.put("name", it) }
             store.forwardOf(s.providerId)?.let { (rule, src) -> p.put("rule", rule).put("fwdOf", src) }
             if (p.toString().toByteArray(Charsets.UTF_8).size <= MAX_SMS_JSON) return p
             keep /= 2

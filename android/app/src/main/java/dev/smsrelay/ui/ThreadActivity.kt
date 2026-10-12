@@ -2,7 +2,6 @@ package dev.smsrelay.ui
 
 import android.app.Activity
 import android.app.AlertDialog
-import android.content.ContentValues
 import android.database.ContentObserver
 import android.os.Bundle
 import android.os.Handler
@@ -49,6 +48,15 @@ class ThreadActivity : Activity() {
         if (address.isEmpty()) return finish()
         if (threadId < 0) threadId = SmsSender.threadId(this, address) ?: return finish()
         title = address
+        val app = applicationContext
+        Ui.io.execute {
+            // A saved contact's name as the title, the number underneath.
+            val name = dev.smsrelay.Contacts.nameOf(app, address) ?: return@execute
+            runOnUiThread {
+                title = name
+                actionBar?.subtitle = address
+            }
+        }
         actionBar?.setDisplayHomeAsUpEnabled(true)
 
         val list = ListView(this).apply {
@@ -146,12 +154,7 @@ class ThreadActivity : Activity() {
         val t = threadId
         Ui.io.execute {
             val items = runCatching {
-                // Opening a conversation reads it, as in any messaging app.
-                contentResolver.update(
-                    Telephony.Sms.CONTENT_URI,
-                    ContentValues().apply { put(Telephony.Sms.READ, 1); put(Telephony.Sms.SEEN, 1) },
-                    "${Telephony.Sms.THREAD_ID} = ? AND ${Telephony.Sms.READ} = 0", arrayOf(t.toString()),
-                )
+                SmsSender.markRead(this, t) // opening a conversation reads it, as in any messaging app
                 // The draft lives in the reply box, not in the list.
                 contentResolver.query(
                     Telephony.Sms.CONTENT_URI,
