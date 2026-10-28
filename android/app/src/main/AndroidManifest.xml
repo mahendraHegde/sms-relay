@@ -12,6 +12,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Keep-alive pings and reconnect retries on time: an inexact alarm can be deferred past the
+         broker's keep-alive deadline, and the connection then drops. Same number of wake-ups. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <!-- Contact names instead of numbers (optional: refused means numbers). -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
 

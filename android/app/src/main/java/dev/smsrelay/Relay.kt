@@ -118,10 +118,7 @@ object Relay {
             // Offline: an SMS (often an OTP) is worth an attempt even during a long backoff, but SMS
             // senders must not be able to drive more than one handshake per SMS_RETRY_GAP_MS.
             val gap = maxOf(SMS_RETRY_GAP_MS, lastBackoffMs / 2)
-            if (!connected() && (backoffOver() || SystemClock.elapsedRealtime() - lastAttemptAt >= gap)) {
-                retryNotBefore = 0
-                checkNow(ctx)
-            }
+            if (!connected() && (backoffOver() || SystemClock.elapsedRealtime() - lastAttemptAt >= gap)) checkNow(ctx, now = true)
         }
     }
 
@@ -140,14 +137,23 @@ object Relay {
     fun check(ctx: Context) = onExec(ctx, 30_000, "check") { checkNow(ctx) }
 
     /**
+     * "Restart relay" in setup: try now, whatever the backoff says (it can be 30 minutes after repeated
+     * failures), from a fresh transport unless connected or an attempt is in flight.
+     */
+    fun restart(ctx: Context) = onExec(ctx, 30_000, "restart") { checkNow(ctx, now = true) }
+
+    /**
      * The default network changed. Moved to Wi-Fi or mobile data while connected over the other one:
      * move the connection over (a Wi-Fi that lost internet can leave a socket that looks connected
      * until the next keep-alive, up to an hour away).
      */
     fun networkChanged(ctx: Context) = onExec(ctx, 30_000, "network") {
-        retryNotBefore = 0 // a new network is worth trying at once, whatever the backoff says
-        val now = networkKind(ctx)
-        if (connected() && connectedOn != now && (now == "wifi" || now == "cell")) rebuild(ctx) else checkNow(ctx)
+        // A new network is worth trying at once, whatever the backoff says.
+        val kind = networkKind(ctx)
+        // Connected or still connecting over the other one: move over now (an attempt on a dying Wi-Fi
+        // would otherwise fail later and back off while the new network sits unused).
+        val live = connected() || mqtt?.connectingNow() == true
+        if (live && connectedOn != kind && (kind == "wifi" || kind == "cell")) rebuild(ctx) else checkNow(ctx, now = true)
     }
 
     /**
@@ -157,17 +163,17 @@ object Relay {
      * 5 minutes, so a network whose validation flaps cannot force a reconnect on every flap.
      */
     fun internetBack(ctx: Context, replaceLive: Boolean) = onExec(ctx, 30_000, "internet") {
-        retryNotBefore = 0
         val now = SystemClock.elapsedRealtime()
         if (replaceLive && connected() && now - lastInternetRebuild >= INTERNET_REBUILD_GAP_MS) {
             lastInternetRebuild = now
             rebuild(ctx)
         }
-        checkNow(ctx)
+        checkNow(ctx, now = true)
     }
 
     private var lastInternetRebuild = -INTERNET_REBUILD_GAP_MS
     private const val INTERNET_REBUILD_GAP_MS = 5 * 60_000L
+    private val CONNECTION_ERRORS = setOf("connect", "subscribe", "lost", "ping")
 
     /** Forwarding screen (behind the screen lock): current rules and allowlist. */
     fun forwarding(ctx: Context, done: (Rules.RuleSet?, List<Allowlist.Entry>) -> Unit) = exec.execute {
@@ -210,7 +216,12 @@ object Relay {
 
     // ---- internals (all on exec) ----
 
-    private fun checkNow(ctx: Context) {
+    /**
+     * Reconnect if needed, then reconcile. [now]: the caller has a fresh reason to try (a new network,
+     * internet back, an SMS, the user), so skip the backoff, including the one a hung attempt would add.
+     */
+    private fun checkNow(ctx: Context, now: Boolean = false) {
+        if (now) retryNotBefore = 0
         // Connecting comes first and on its own: nothing in reconcile may keep the phone offline,
         // because being reachable is what lets the reader see and fix problems.
         val c = runCatching {
@@ -224,21 +235,23 @@ object Relay {
                 rebuild(ctx)
             }
             val t = mqtt
-            if (t?.stuck() == true) {
-                // A hung attempt counts as a failure: drop it and back off like any other.
+            val hung = t?.stuckReason()
+            if (t != null && hung != null) {
+                // A hung attempt counts as a failure: drop it and back off like any other (unless [now]).
                 t.close()
                 mqtt = null
                 core = null
+                // After close(): closing fails the pending tokens, whose callbacks would overwrite it.
+                lastError = "$hung: timed out"
                 val hb = heartbeat(ctx, connectedOn ?: networkKind(ctx))
                 hb.onConnectFailed() // a hang right after a climb may be the broker refusing it
-                backOff(ctx, hb.nextRetryMs())
+                if (!now) backOff(ctx, hb.nextRetryMs())
             }
             if (backoffOver()) {
                 // Not connected and no attempt in flight: start from a fresh transport, so keep-alive,
                 // battery mode and network kind match the network we are on now.
                 val cur = mqtt
-                if (cur != null && !cur.isConnected() && !cur.connectingNow()) rebuild(ctx)
-                ensure(ctx)?.also { connect(ctx) }
+                if (cur != null && !cur.isConnected() && !cur.connectingNow()) rebuild(ctx) else ensure(ctx)?.also { connect(ctx) }
             }
             // Connected but the subscribe has not been confirmed: look again shortly.
             if (mqtt?.awaitingSubscribe() == true) wakeCheckIn(ctx, CONNECT_ALARM, 40_000)
@@ -367,6 +380,8 @@ object Relay {
                 try {
                     if (current()) {
                         retryNotBefore = 0
+                        // Clear only connection errors; a journal or reconcile failure stays visible.
+                        if (lastError?.substringBefore(':') in CONNECTION_ERRORS) lastError = null
                         cancelCheckIn(appCtx, CONNECT_ALARM) // resolved: no deadline check needed
                         hb.onConnected()
                         c.onConnected() // announces once if pairing is unfinished
@@ -388,6 +403,7 @@ object Relay {
                     // Unanswered ping: the path is dead (often a NAT that dropped us). Start over.
                     if (!onBattery) hb.onLost()
                     rebuild(appCtx)
+                    lastError = "ping: no answer"
                 } else if (hb.onPingOk(learn = !onBattery)) {
                     rebuild(appCtx) // reconnect with the next, longer keep-alive
                 }
@@ -491,6 +507,7 @@ object Relay {
             .put("doze", ctx.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(ctx.packageName))
             .put("net", connectedOn)
             .put("up", (SystemClock.elapsedRealtime() - startedAt) / 1000)
+            .put("err", lastError ?: "")
             .put("ver", BuildConfig.VERSION_NAME)
     }
 }

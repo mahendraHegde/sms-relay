@@ -71,8 +71,11 @@ class AlarmPingSender(
     }
 
     override fun stop() {
+        // One alarm is shared by every connection: a replaced connection whose shutdown finishes late
+        // must not cancel the pings of the one that replaced it (that one would never notice a dead path).
+        if (current !== this) return
+        current = null
         ctx.getSystemService(AlarmManager::class.java).cancel(pi)
-        if (current === this) current = null
     }
 
     override fun schedule(delayInMillis: Long) {

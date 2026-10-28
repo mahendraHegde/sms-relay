@@ -13,6 +13,7 @@ import org.eclipse.paho.client.mqttv3.IMqttToken
 import org.eclipse.paho.client.mqttv3.MqttAsyncClient
 import org.eclipse.paho.client.mqttv3.MqttCallbackExtended
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions
+import org.eclipse.paho.client.mqttv3.MqttException
 import org.eclipse.paho.client.mqttv3.MqttMessage
 import org.eclipse.paho.client.mqttv3.MqttPingSender
 import org.eclipse.paho.client.mqttv3.internal.HighResolutionTimer
@@ -107,20 +108,21 @@ class MqttTransport(
                         }
                         override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
                             Power.release(w)
-                            onError("subscribe: ${exception?.javaClass?.simpleName ?: "refused by broker"}")
+                            onError("subscribe: ${exception?.let(::why) ?: "refused by broker"}")
                             runCatching { client.disconnect() }
                             onConnectFailed()
                         }
                     })
                 } catch (e: Exception) {
                     Power.release(w)
-                    onError("subscribe: ${e.javaClass.simpleName}")
+                    onError("subscribe: ${why(e)}")
                     onConnectFailed()
                 }
             }
 
             override fun connectionLost(cause: Throwable?) {
-                Log.w("MqttTransport", "connection lost: ${cause?.javaClass?.simpleName}")
+                Log.w("MqttTransport", "connection lost: ${why(cause)}")
+                onError("lost: ${why(cause)}")
                 onLost()
             }
 
@@ -139,12 +141,18 @@ class MqttTransport(
      * silent would leave us "connecting" (or connected but unsubscribed) forever. Relay rebuilds
      * the transport when this says the attempt is hopeless.
      */
-    fun stuck(): Boolean {
+    fun stuck(): Boolean = stuckReason() != null
+
+    /** Which phase hung ("connect" or "subscribe"), or null if nothing is stuck. */
+    fun stuckReason(): String? {
         val now = SystemClock.elapsedRealtime()
         // Paho allows connectionTimeout (30 s) for TCP and again for TLS, plus DNS: a slow attempt on a
         // poor link can legitimately take ~70 s, so only call it hopeless after 90 s.
-        return (connecting.get() && now - connectingSince > STUCK_CONNECT_MS) ||
-            (client.isConnected && !subscribed && now - connectedAt > 30_000)
+        return when {
+            connecting.get() && now - connectingSince > STUCK_CONNECT_MS -> "connect"
+            client.isConnected && !subscribed && now - connectedAt > 30_000 -> "subscribe"
+            else -> null
+        }
     }
 
     /** Connected, subscribe not confirmed yet (and not yet given up on). */
@@ -169,14 +177,18 @@ class MqttTransport(
                 override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
                     connecting.set(false)
                     Power.release(lock)
-                    onError("connect: ${exception?.javaClass?.simpleName}")
+                    onError("connect: ${why(exception)}")
                     onConnectFailed() // retry later, backing off, without holding the CPU
                 }
             })
             true
         } catch (e: Exception) {
-            connecting.set(false) // Paho throws if a connect is already in flight
+            // Paho refused to start (e.g. still disconnecting): a failed attempt like any other, so the
+            // retry alarm chain goes on instead of waiting for the next network change or watchdog.
+            connecting.set(false)
             Power.release(lock)
+            onError("connect: ${why(e)}")
+            onConnectFailed()
             false
         }
     }
@@ -223,4 +235,19 @@ class MqttTransport(
         runCatching { client.disconnectForcibly(1000, 1000) }
         runCatching { client.close() }
     }
+}
+
+/** Class names down the cause chain (TLS failures hide the useful one a level or two deeper). */
+private fun causes(t: Throwable?): String =
+    generateSequence(t) { it.cause }.take(3).joinToString(" < ") { it.javaClass.simpleName }
+
+/**
+ * A short reason for the status screen: Paho's reason code (e.g. 4 bad user name or password, 5 not
+ * authorized, 32103 cannot reach the broker) and the underlying exception's class. Never the message
+ * text, which can carry host names or addresses.
+ */
+private fun why(t: Throwable?): String = when (t) {
+    null -> "unknown"
+    is MqttException -> "reason ${t.reasonCode}" + causes(t.cause).let { if (it.isEmpty()) "" else " ($it)" }
+    else -> causes(t).ifEmpty { "unknown" }
 }

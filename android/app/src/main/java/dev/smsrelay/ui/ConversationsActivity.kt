@@ -22,6 +22,8 @@ import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
 import dev.smsrelay.R
+import dev.smsrelay.RelayService
+import dev.smsrelay.Secrets
 import dev.smsrelay.SmsSender
 
 /** The launcher screen: an ordinary conversation list. */
@@ -95,6 +97,10 @@ class ConversationsActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        // Opening the app brings the relay back if a battery manager killed it (no alarm or broadcast
+        // reaches an app the vendor has stopped). Cheap when it is already running: no check is made.
+        val app = applicationContext
+        Ui.io.execute { if (Secrets.get(app).pairing != null) RelayService.keepRunning(app) }
         // Android 13+ asks before showing notifications (Android 10 does not need this).
         val prefs = getSharedPreferences("ui", MODE_PRIVATE)
         // Contacts: ask once, for names instead of numbers; refused means numbers, nothing else changes.

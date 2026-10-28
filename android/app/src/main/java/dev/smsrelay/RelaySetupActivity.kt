@@ -85,7 +85,10 @@ class RelaySetupActivity : Activity() {
                 .setNegativeButton("Cancel", null)
                 .show()
         })
-        col.addView(button("Restart relay") { RelayService.start(this) })
+        col.addView(button("Restart relay") {
+            RelayService.keepRunning(this)
+            Relay.restart(this)
+        })
         col.addView(button("Unpair (forget reader and outbox)") {
             Relay.repair(this, null) {
                 ui.post {

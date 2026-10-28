@@ -926,6 +926,9 @@ function renderStatus() {
     s && s.queue ? el("span", {}, `${s.queue} waiting on phone`) : null,
     pending.size ? el("span", {}, `${pending.size} command(s) pending`) : null,
     s && s.fwdBlocked ? el("span", { class: "bad" }, `${s.fwdBlocked} forward(s) held back by the hourly/daily limit`) : null,
+    // A short uptime after an outage means the app was killed and restarted, not just disconnected.
+    s && Number.isFinite(s.up) && s.up < 3600 ? el("span", {}, `relay restarted ${s.up < 60 ? "under a minute" : `${Math.round(s.up / 60)} min`} ago`) : null,
+    s && typeof s.err === "string" && s.err ? el("span", { class: "bad" }, `last phone error: ${s.err.slice(0, 80)}`) : null,
   ].filter(Boolean));
   document.getElementById("warning").replaceChildren(
     warning ? el("p", { class: "warn" }, warning, " ", el("button", { class: "link", on: { click: () => { warning = null; renderStatus(); } } }, "dismiss")) : "",
